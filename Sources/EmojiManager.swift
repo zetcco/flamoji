@@ -19,51 +19,22 @@ struct EmojiDef: Hashable {
 struct EmojiManager {
     static let shared = EmojiManager()
     
-    // Base database
-    private let baseEmojis: [EmojiDef] = [
-        // Faces & Emotion
-        EmojiDef(symbol: "😀", tags: ["smile", "happy", "face", "grin"]),
-        EmojiDef(symbol: "😂", tags: ["laugh", "cry", "tears", "joy", "haha", "lmao"]),
-        EmojiDef(symbol: "🥲", tags: ["smile", "cry", "tear", "happy", "relieved", "pain", "sad"]),
-        EmojiDef(symbol: "😎", tags: ["cool", "glasses", "sunglasses", "smile", "boss"]),
-        EmojiDef(symbol: "🤔", tags: ["think", "hmm", "ponder", "wonder", "face"]),
-        EmojiDef(symbol: "😭", tags: ["cry", "sob", "sad", "tears", "bawl"]),
-        EmojiDef(symbol: "💀", tags: ["skull", "dead", "death", "skeleton", "deadass"]),
-        EmojiDef(symbol: "👀", tags: ["eyes", "look", "see", "watch", "stare", "peep"]),
-        EmojiDef(symbol: "🥰", tags: ["love", "hearts", "affection", "cute", "adore"]),
-        EmojiDef(symbol: "🤷‍♂️", tags: ["shrug", "idk", "confused", "dunno", "man"]),
-        EmojiDef(symbol: "🤦‍♂️", tags: ["facepalm", "disappointed", "sigh", "stupid"]),
+    let baseEmojis: [EmojiDef]
+    
+    init() {
+        // Load the massive emoji dictionary from our bundled JSON file
+        guard let url = Bundle.module.url(forResource: "emojis", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              // The JSON is formatted as a dictionary: {"😀": ["face", "grin", "happy"], ...}
+              let dict = try? JSONDecoder().decode([String: [String]].self, from: data) else {
+            print("⚠️ Failed to load emojis.json! Make sure it's in the Sources folder and Package.swift is updated.")
+            self.baseEmojis = []
+            return
+        }
         
-        // Gestures
-        EmojiDef(symbol: "👍", tags: ["thumbs", "up", "yes", "approve", "good", "ok"]),
-        EmojiDef(symbol: "👎", tags: ["thumbs", "down", "no", "bad", "disapprove"]),
-        EmojiDef(symbol: "🙌", tags: ["hands", "raise", "celebrate", "praise", "yay"]),
-        EmojiDef(symbol: "🙏", tags: ["pray", "please", "thanks", "ask", "hands"]),
-        EmojiDef(symbol: "🤝", tags: ["handshake", "deal", "agree", "meet"]),
-        
-        // Symbols & Objects
-        EmojiDef(symbol: "🔥", tags: ["fire", "hot", "flame", "lit", "red"]),
-        EmojiDef(symbol: "✨", tags: ["sparkles", "stars", "magic", "shiny", "clean"]),
-        EmojiDef(symbol: "💯", tags: ["100", "hundred", "perfect", "score", "keep"]),
-        EmojiDef(symbol: "🛑", tags: ["stop", "red", "sign", "halt", "error"]),
-        EmojiDef(symbol: "✅", tags: ["check", "mark", "green", "yes", "done", "success"]),
-        EmojiDef(symbol: "❌", tags: ["cross", "x", "red", "no", "cancel", "wrong"]),
-        EmojiDef(symbol: "❤️", tags: ["heart", "red", "love", "like"]),
-        
-        // Tech & Work
-        EmojiDef(symbol: "💻", tags: ["computer", "mac", "laptop", "pc", "work", "code"]),
-        EmojiDef(symbol: "📱", tags: ["phone", "mobile", "iphone", "call", "app"]),
-        EmojiDef(symbol: "🚀", tags: ["rocket", "launch", "space", "ship", "fast", "shipit"]),
-        EmojiDef(symbol: "🐛", tags: ["bug", "insect", "error", "fix", "code"]),
-        EmojiDef(symbol: "🔨", tags: ["hammer", "build", "tool", "work", "fix"]),
-        EmojiDef(symbol: "🎨", tags: ["art", "palette", "design", "colors", "draw"]),
-        
-        // Food & Nature
-        EmojiDef(symbol: "🍎", tags: ["apple", "red", "fruit", "food", "mac"]),
-        EmojiDef(symbol: "🍕", tags: ["pizza", "food", "slice", "cheese"]),
-        EmojiDef(symbol: "☕️", tags: ["coffee", "cup", "drink", "cafe", "tea", "morning"]),
-        EmojiDef(symbol: "🌍", tags: ["earth", "world", "globe", "planet", "global"])
-    ]
+        // Convert the JSON dictionary into our workable structs
+        self.baseEmojis = dict.map { EmojiDef(symbol: $0.key, tags: $0.value) }
+    }
     
     // Fetches the persistent usage dictionary from disk
     private var usageStats: [String: Int] {
