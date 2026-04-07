@@ -66,21 +66,6 @@ Flamoji is built using the Swift Package Manager (SPM) and wrapped with a standa
 
 *Note: Because Flamoji is launched via the command line, macOS requires you to grant **Accessibility permissions to your Terminal app** (e.g., Terminal, iTerm2, Kitty) in `System Settings > Privacy & Security > Accessibility` to allow keystroke injection.*
 
-### Run Automatically on Startup (Stealth Mode)
-To have Flamoji start automatically without triggering MDM alerts or showing up in the UI Login Items, use the native UNIX `cron` scheduler:
-
-1. Open your terminal and run:
-   ```bash
-   env EDITOR=nano crontab -e
-   ```
-2. Paste this at the bottom of the file:
-   ```bash
-   @reboot nohup ~/.flamoji/flamoji > /dev/null 2>&1 &
-   ```
-3. Save (`Ctrl+O`, `Enter`) and exit (`Ctrl+X`).
-
----
-
 ## ⌨️ Usage
 
 * **Trigger:** Press `Cmd + Option + E` anywhere on your Mac to open the panel.
