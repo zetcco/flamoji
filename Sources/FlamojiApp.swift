@@ -42,7 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         setupPanel()
         setupGlobalHotkey()
-        print("Flamoji is running smoothly! Press Cmd + Option + E to trigger.")
+        print("Flamoji is running! Press Cmd + Option + E to trigger.")
     }
 
     func setupPanel() {
@@ -100,22 +100,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isShowing = true
         appState.searchQuery = ""
         appState.isSearchSelected = false
-        appState.filteredEmojis = EmojiManager.shared.allEmojis // Reloads the newly sorted list based on usage
+        appState.filteredEmojis = EmojiManager.shared.allEmojis
         appState.selectedIndex = 0
-        appState.resetScrollTrigger = UUID() // Triggers the ScrollView to jump to the top
+        appState.resetScrollTrigger = UUID()
         
-        let screenBounds = CGDisplayBounds(CGMainDisplayID())
         let panelWidth: CGFloat = 280.0
         let panelHeight: CGFloat = 270.0
         
+        // 1. Get the best possible screen reference safely
+        let mouseLoc = NSEvent.mouseLocation
+        let screens = NSScreen.screens
+        let currentScreen = screens.first { NSMouseInRect(mouseLoc, $0.frame, false) } ?? NSScreen.main ?? screens.first
+        
+        // 2. Fallback to a default size if for some reason NO screen is detected
+        let screenFrame = currentScreen?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let visibleFrame = currentScreen?.visibleFrame ?? screenFrame
+        
+        var targetPoint: CGPoint = .zero
+        
         if let caretPos = getCaretPosition() {
-            let popupPoint = CGPoint(x: caretPos.x - 16, y: screenBounds.height - caretPos.y - panelHeight - 30) 
-            panel.setFrameOrigin(popupPoint)
+            // Convert Accessibility (Top-Left) to AppKit (Bottom-Left)
+            targetPoint = CGPoint(
+                x: caretPos.x - 16, 
+                y: screenFrame.height - caretPos.y - panelHeight - 30
+            )
         } else {
-            let mouseLoc = NSEvent.mouseLocation
-            panel.setFrameOrigin(CGPoint(x: mouseLoc.x + 10, y: mouseLoc.y - panelHeight))
+            // Fallback to mouse position if caret isn't found
+            targetPoint = CGPoint(
+                x: mouseLoc.x + 10, 
+                y: mouseLoc.y - panelHeight
+            )
         }
         
+        // 3. Smart Clamping (Prevent Overflow)
+        // Ensure the panel stays within the horizontal visible bounds
+        let minX = visibleFrame.origin.x + 10
+        let maxX = visibleFrame.origin.x + visibleFrame.width - panelWidth - 10
+        targetPoint.x = max(minX, min(targetPoint.x, maxX))
+        
+        // Ensure the panel stays within the vertical visible bounds (Dock/Menu Bar aware)
+        let minY = visibleFrame.origin.y + 10
+        let maxY = visibleFrame.origin.y + visibleFrame.height - panelHeight - 10
+        targetPoint.y = max(minY, min(targetPoint.y, maxY))
+        
+        // 4. Set position and show
+        panel.setFrameOrigin(targetPoint)
         panel.makeKeyAndOrderFront(nil)
         
         if localEventMonitor == nil {
