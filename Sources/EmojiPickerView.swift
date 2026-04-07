@@ -15,8 +15,9 @@ struct EmojiPickerView: View {
                 Text(state.searchQuery.isEmpty ? "Search..." : state.searchQuery)
                     .foregroundColor(state.searchQuery.isEmpty ? .secondary : (state.isSearchSelected ? .white : .primary))
                     .font(.system(size: 14, weight: .medium))
-                    .padding(.horizontal, state.isSearchSelected ? 4 : 0)
-                    .padding(.vertical, state.isSearchSelected ? 2 : 0)
+                    // THE FIX: Padding is applied permanently so the height never shifts
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
                     .background(state.isSearchSelected ? Color.accentColor : Color.clear)
                     .cornerRadius(4)
                 
