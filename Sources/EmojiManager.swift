@@ -19,8 +19,8 @@ struct EmojiDef: Hashable {
 struct EmojiManager {
     static let shared = EmojiManager()
     
-    // A robust starter database. You can easily expand this!
-    let allEmojis: [EmojiDef] = [
+    // Base database
+    private let baseEmojis: [EmojiDef] = [
         // Faces & Emotion
         EmojiDef(symbol: "😀", tags: ["smile", "happy", "face", "grin"]),
         EmojiDef(symbol: "😂", tags: ["laugh", "cry", "tears", "joy", "haha", "lmao"]),
@@ -65,7 +65,31 @@ struct EmojiManager {
         EmojiDef(symbol: "🌍", tags: ["earth", "world", "globe", "planet", "global"])
     ]
     
+    // Fetches the persistent usage dictionary from disk
+    private var usageStats: [String: Int] {
+        UserDefaults.standard.dictionary(forKey: "flamojiUsage") as? [String: Int] ?? [:]
+    }
+    
+    // Increments the count for a specific emoji and saves it to disk
+    func recordUsage(symbol: String) {
+        var stats = usageStats
+        stats[symbol, default: 0] += 1
+        UserDefaults.standard.set(stats, forKey: "flamojiUsage")
+    }
+    
+    // Returns the base array, sorted dynamically by usage stats
+    var allEmojis: [EmojiDef] {
+        let stats = usageStats
+        return baseEmojis.sorted { a, b in
+            let countA = stats[a.symbol] ?? 0
+            let countB = stats[b.symbol] ?? 0
+            return countA > countB
+        }
+    }
+    
     func search(query: String) -> [EmojiDef] {
-        return allEmojis.filter { $0.matches(query: query) }
+        let sorted = allEmojis
+        if query.isEmpty { return sorted }
+        return sorted.filter { $0.matches(query: query) }
     }
 }

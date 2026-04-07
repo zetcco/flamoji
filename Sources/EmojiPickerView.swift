@@ -13,10 +13,8 @@ struct EmojiPickerView: View {
                     .foregroundColor(.secondary)
                 
                 Text(state.searchQuery.isEmpty ? "Search..." : state.searchQuery)
-                    // If selected, turn text white, else normal colors
                     .foregroundColor(state.searchQuery.isEmpty ? .secondary : (state.isSearchSelected ? .white : .primary))
                     .font(.system(size: 14, weight: .medium))
-                    // Add tiny padding and blue background to mimic standard macOS text selection
                     .padding(.horizontal, state.isSearchSelected ? 4 : 0)
                     .padding(.vertical, state.isSearchSelected ? 2 : 0)
                     .background(state.isSearchSelected ? Color.accentColor : Color.clear)
@@ -45,18 +43,19 @@ struct EmojiPickerView: View {
                                     .frame(width: 36, height: 36)
                                     .background(index == state.selectedIndex ? Color.accentColor : Color.clear)
                                     .cornerRadius(8)
-                                    // Give each item an ID so ScrollViewReader can find it
                                     .id(index)
                             }
                         }
                         .padding(.horizontal, 12)
                         .padding(.bottom, 12)
-                        // This will finally work because SwiftUI state is actually preserved!
                         .onChange(of: state.selectedIndex) { newIndex in
-                            // Adding a tiny animation makes it glide like a text cursor
                             withAnimation(.easeInOut(duration: 0.1)) {
                                 proxy.scrollTo(newIndex, anchor: nil)
                             }
+                        }
+                        // Instantly reset scroll position when the panel is opened
+                        .onChange(of: state.resetScrollTrigger) { _ in
+                            proxy.scrollTo(0, anchor: .top)
                         }
                     }
                 }

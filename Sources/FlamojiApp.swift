@@ -4,33 +4,28 @@ import CoreGraphics
 import ApplicationServices
 
 // MARK: - Shared State
-// This allows AppKit to update variables and SwiftUI to animate the changes natively.
+// Allows AppKit to update variables and SwiftUI to animate the changes natively.
 @MainActor
 class AppState: ObservableObject {
     @Published var searchQuery = ""
     @Published var isSearchSelected = false
     @Published var filteredEmojis: [EmojiDef] = []
     @Published var selectedIndex = 0
+    // Changing this UUID triggers the SwiftUI view to reset its scroll position
+    @Published var resetScrollTrigger = UUID()
     let columnsCount = 6
 }
 
 // MARK: - Panel
 class FlamojiPanel: NSPanel {
-    override var canBecomeKey: Bool {
-        return true
-    }
+    override var canBecomeKey: Bool { return true }
 }
 
 @main
 @MainActor
 struct EmojiPopupApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-
-    var body: some Scene {
-        Settings {
-            Text("Emoji Popup Settings")
-        }
-    }
+    var body: some Scene { Settings { Text("Settings") } }
 }
 
 @MainActor
@@ -40,9 +35,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var eventTap: CFMachPort?
     var targetApp: NSRunningApplication?
     
-    // We now hold a single source of truth for the UI
     let appState = AppState()
-
     var isShowing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -56,46 +49,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel = FlamojiPanel(
             contentRect: NSRect(x: 0, y: 0, width: 280, height: 270), 
             styleMask: [.borderless, .nonactivatingPanel], 
-            backing: .buffered,
-            defer: false
+            backing: .buffered, defer: false
         )
-        
         panel.level = .floating
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .ignoresCycle]
         
-        // We only embed the SwiftUI view ONCE now!
         let contentView = EmojiPickerView(state: appState)
         panel.contentView = NSHostingView(rootView: contentView)
         
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(panelLostFocus),
-            name: NSWindow.didResignKeyNotification,
-            object: panel
-        )
+        NotificationCenter.default.addObserver(self, selector: #selector(panelLostFocus), name: NSWindow.didResignKeyNotification, object: panel)
     }
 
-    @objc func panelLostFocus() {
-        hidePopup()
-    }
+    @objc func panelLostFocus() { hidePopup() }
 
     func setupGlobalHotkey() {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         
         eventTap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(eventMask),
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: CGEventMask(eventMask),
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
                 if type == .keyDown {
                     let flags = event.flags
                     let keycode = event.getIntegerValueField(.keyboardEventKeycode)
-                    
                     if flags.contains(.maskCommand) && flags.contains(.maskAlternate) && keycode == 14 {
                         let mySelf = Unmanaged<AppDelegate>.fromOpaque(refcon!).takeUnretainedValue()
                         DispatchQueue.main.async { mySelf.togglePopup() }
@@ -103,10 +82,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
                 return Unmanaged.passRetained(event)
-            },
-            userInfo: userInfo
+            }, userInfo: userInfo
         )
-        
         guard let tap = eventTap else { return }
         let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
@@ -118,27 +95,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showPopup() {
-        if !isShowing {
-            targetApp = NSWorkspace.shared.frontmostApplication
-        }
+        if !isShowing { targetApp = NSWorkspace.shared.frontmostApplication }
         
         isShowing = true
-        
-        // Reset our state for a fresh open
         appState.searchQuery = ""
         appState.isSearchSelected = false
-        appState.filteredEmojis = EmojiManager.shared.allEmojis
+        appState.filteredEmojis = EmojiManager.shared.allEmojis // Reloads the newly sorted list based on usage
         appState.selectedIndex = 0
+        appState.resetScrollTrigger = UUID() // Triggers the ScrollView to jump to the top
         
         let screenBounds = CGDisplayBounds(CGMainDisplayID())
         let panelWidth: CGFloat = 280.0
         let panelHeight: CGFloat = 270.0
         
         if let caretPos = getCaretPosition() {
-            let popupPoint = CGPoint(
-                x: caretPos.x - 16, 
-                y: screenBounds.height - caretPos.y - panelHeight - 30
-            ) 
+            let popupPoint = CGPoint(x: caretPos.x - 16, y: screenBounds.height - caretPos.y - panelHeight - 30) 
             panel.setFrameOrigin(popupPoint)
         } else {
             let mouseLoc = NSEvent.mouseLocation
@@ -167,7 +138,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func getCaretPosition() -> CGPoint? {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedElement: CFTypeRef?
-        
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else { return nil }
         let element = focusedElement as! AXUIElement
         
@@ -180,19 +150,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let boundsValue = bounds as! AXValue
         var rect: CGRect = .zero
         AXValueGetValue(boundsValue, .cgRect, &rect)
-        
         if rect.origin.x == 0 && rect.origin.y == 0 { return nil }
         return CGPoint(x: rect.origin.x, y: rect.origin.y)
     }
 
     func handleKeyPress(_ event: NSEvent) {
-        // Intercept Cmd+A / Ctrl+A and Cmd+Backspace
         let isModifierPressed = event.modifierFlags.intersection([.command, .control]).isEmpty == false
         if isModifierPressed {
             if event.keyCode == 0 { // 'A' key
-                if !appState.searchQuery.isEmpty {
-                    appState.isSearchSelected = true
-                }
+                if !appState.searchQuery.isEmpty { appState.isSearchSelected = true }
             } else if event.keyCode == 51 { // Backspace
                 appState.searchQuery = ""
                 appState.isSearchSelected = false
@@ -256,12 +222,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func insertEmoji(_ emoji: String) {
         guard let app = targetApp else { return }
         
+        // Permanently record that this emoji was used
+        EmojiManager.shared.recordUsage(symbol: emoji)
+        
         let source = CGEventSource(stateID: .hidSystemState)
         let utf16Chars = Array(emoji.utf16)
         
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
         keyDown?.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: utf16Chars)
-        
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
         keyUp?.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: utf16Chars)
         
